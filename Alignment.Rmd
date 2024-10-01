@@ -1,0 +1,574 @@
+```{r}
+#Librairies
+library('dplyr')
+```
+
+
+# Alignement
+
+## LCS
+
+```{r}
+# Variable
+
+R <- "ATTCGGTTA"
+S <- "TAGTGATG"
+
+```
+
+```{r}
+printLCS <- function(b, seq, i, j){
+  res <- ""
+  if(i==1 || j==1){
+    print(res)
+    return
+  } else {
+    if(b[i,j]==2){
+      printLCS(b, seq, i-1, j-1)
+      print(substr(seq, j, j))
+      } else {
+        if(b[i,j]==0){
+          printLCS(b, seq, i-1, j)
+        } else {
+          printLCS(b, seq, i, j-1)
+        }
+      }
+  }
+}
+```
+
+```{r}
+LCS <- function(X, Y) {
+  lx <- nchar(X)
+  ly <- nchar(Y)
+  A <- matrix(
+        0,
+        nrow = lx+1, 
+        ncol = ly+1
+      )
+  B <- matrix(
+        0,
+        nrow = lx+1, 
+        ncol = ly+1
+      )
+  
+  for (i in 1:lx+1) {
+    xi <- substr(X, i-1, i-1)
+
+    for (j in 1:ly+1) {
+      yj <- substr(Y, j-1, j-1)
+      
+      f <- if(xi==yj) 1 else 0
+      
+      A[i,j] <- max(
+                    A[i-1,j],
+                    A[i, j-1],
+                    A[i-1, j-1]+f
+      )
+      
+      if (A[i,j]==A[i-1,j]) {
+        B[i,j] <- 0
+      } else {
+        B[i,j] <- if (A[i,j]==A[i,j-1]) 1 else 2
+      }
+      
+    }
+  }
+
+  printLCS(B, X, lx+1, ly+1)
+  
+  # print(A)
+  # print(B)
+  
+  # return (c(A,B))
+}
+```
+
+```{r}
+result <- LCS(R,S)
+```
+
+
+```{r}
+AllLCS <- function(X, Y) {
+  lx <- nchar(X)
+  ly <- nchar(Y)
+  
+  A <- matrix(0, nrow = lx + 1, ncol = ly + 1)
+  
+  B <- vector("list", (lx + 1) * (ly + 1))
+  dim(B) <- c(lx + 1, ly + 1)
+  
+  for (i in 2:(lx + 1)) {
+    for (j in 2:(ly + 1)) {
+      xi <- substr(X, i - 1, i - 1)
+      yj <- substr(Y, j - 1, j - 1)
+
+      if (xi == yj) {
+        A[i, j] <- A[i - 1, j - 1] + 1
+      } else {
+        A[i, j] <- max(A[i - 1, j], A[i, j - 1])
+      }
+      
+      # Backtracking logic to store where the LCS paths come from
+      z <- integer(0)
+      if (A[i, j] == A[i - 1, j]) {
+        z <- c(z, 0)
+      }
+      if (A[i, j] == A[i, j - 1]) {
+        z <- c(z, 1)
+      }
+      if (A[i, j] == A[i - 1, j - 1] + 1 && A[i, j] != A[i - 1, j] && A[i, j] != A[i, j - 1]) {
+        # print(paste("i",i,"j", j))
+        z <- c(2)
+      }
+      
+      B[[i, j]] <- z
+    }
+  }
+  
+  # Initialize lcs list
+  lcs <- vector("list", (lx + 1) * (ly + 1))
+  dim(lcs) <- c(lx + 1, ly + 1)
+  lcs[[1, 1]] <- list("")
+  
+  for (k in 2:(lx + ly + 2)) {
+    for (i in max(1, k - ly -1):min(k - 1, lx + 1)) {
+      j <- k - i
+      if (i <= lx + 1 && j <= ly + 1) {
+        if (A[i, j] == 0) {
+          lcs[[i, j]] <- list("")
+        } else {
+          b <- B[[i, j]]
+          mots <- character(0)
+          if (2 %in% b) {
+            # print(paste(i-1, j-1))
+            mots <- sapply(lcs[[i - 1, j - 1]], function(word) paste0(word, substr(Y, j - 1, j - 1)))
+          } 
+          if (0 %in% b) {
+            mots <- c(mots, lcs[[i - 1, j]])
+          } 
+          if (1 %in% b) {
+            mots <- c(mots, lcs[[i, j - 1]])
+          }
+          lcs[[i, j]] <- unique(mots)
+        }
+      }
+    }
+  }
+  # return(lcs)
+  
+  return(unique(lcs[[lx + 1, ly + 1]]))
+}
+```
+
+
+```{r}
+AllLCS(R, S)
+```
+
+```{r}
+AllLCS("AGCTTAGCTG", "TCGGATG")
+```
+
+
+## Global Alignment
+
+```{r}
+# Variables de test
+
+R <- "GCCTTAG"
+S <- "GCTAG"
+```
+
+
+```{r}
+# La fonction coût de substitution
+
+cout_delta <- function(r, s){
+  return (if (r==s) 0 else -1)
+}
+```
+
+
+```{r}
+# Fonction écrire l'alignement
+
+printGA <- function(btot, bi, bd, r, s, i, j, m = 2, GAr = c(), GAs = c()){
+
+  
+  if (i==1 && m==2) {
+
+    GA_R <- GAr
+    GA_S <- GAs
+    
+    while(j != 1){
+      GA_R <- c("-", GA_R)
+      GA_S <- c(substr(s, j-1, j-1), GA_S)
+      j <- j-1
+    }
+    
+    print(GA_R)
+    print(GA_S)
+    return()
+  }
+  
+  
+  if (j==1 && m==2) {
+
+    GA_R <- GAr
+    GA_S <- GAs
+    
+    while(i != 1){
+      GA_R <- c(substr(r, i-1, i-1), GA_R)
+      GA_S <- c("-", GA_S)
+      i <- i-1
+    }
+    
+    print(GA_R)
+    print(GA_S)
+    return()
+  }
+  
+  
+  
+  if (m==2){
+    if (btot[i, j] == 2){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i-1,
+        j = j-1,
+        m = 2,
+        GAr = c(substr(r, i-1, i-1), GAr),
+        GAs = c(substr(s, j-1, j-1), GAs)
+      )
+    }
+    
+    if (btot[i, j] == 1){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i,
+        j = j,
+        m = 1,
+        GAr = GAr,
+        GAs = GAs
+      )
+    }
+    
+    if (btot[i, j] == 0){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i,
+        j = j,
+        m = 0,
+        GAr = GAr,
+        GAs = GAs
+      )
+    }
+  }
+  
+  if (m==1){
+    if (bd[i, j] == 2){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i,
+        j = j-1,
+        m = 2,
+        GAr = c("-", GAr),
+        GAs = c(substr(s, j-1, j-1), GAs)
+      )
+    }
+    
+    if (bd[i, j] == 1){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i,
+        j = j-1,
+        m = 1,
+        GAr = c("-", GAr),
+        GAs = c(substr(s, j-1, j-1), GAs)
+      )
+    }
+  }
+  
+  if (m==0){
+    if (bi[i, j] == 2){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i-1,
+        j = j,
+        m = 2,     #btot
+        GAr = c(substr(r, i-1, i-1), GAr),
+        GAs = c("-", GAs)
+      )
+    } 
+    
+    if (bi[i, j] == 0){
+      printGA(
+        btot = btot,
+        bi = bi,
+        bd = bd,
+        r = r,
+        s = s,
+        i = i-1,
+        j = j,
+        m = 0,     #bi
+        GAr = c(substr(r, i-1, i-1), GAr),
+        GAs = c("-", GAs)
+      )
+    }
+  }
+}
+```
+
+
+
+```{r}
+# Fonction Global Alignment
+
+GA <- function(R, S, rho = 2, sigma = 1, c_delta = cout_delta){
+  lr <- nchar(R)
+  ls <- nchar(S)
+  
+  # Création des trois matrices
+  GAtot <- matrix(0, nrow = lr + 1, ncol = ls + 1)
+  GAd <- matrix(0, nrow = lr + 1, ncol = ls + 1)
+  GAi <- matrix(0, nrow = lr + 1, ncol = ls + 1)
+  
+  # Création des matrices de Backtracking
+  Btot <- matrix(2, nrow = lr + 1, ncol = ls + 1)
+  Bd <- matrix(2, nrow = lr + 1, ncol = ls + 1)
+  Bi <- matrix(2, nrow = lr + 1, ncol = ls + 1)
+  
+  # Initialisation
+  for (i in 1:lr+1){
+    GAtot[i, 1] <- GAtot[i-1, 1] - sigma
+    GAd[i, 1] <- GAd[i-1, 1] - sigma
+    GAi[i, 1] <- GAi[i-1, 1] - sigma
+  }
+  
+  for (j in 1:ls+1){
+    GAtot[1, j] <- GAtot[1, j-1] - sigma
+    GAd[1, j] <- GAd[1, j-1] - sigma
+    GAi[1, j] <- GAi[1, j-1] - sigma
+  }
+  
+
+  # Remplissage
+  for (k in 4:(lr + ls + 2)) {
+    for (i in max(2, k - ls -1):min(k - 2, lr + 1)) {
+      j <- k - i
+      r <- substr(R, i - 1, i - 1)
+      s <- substr(S, j - 1, j - 1)
+
+      GAi[i, j] <- max(
+        GAi[i-1, j] - sigma,
+        GAtot[i-1, j] - (rho+sigma)
+      )
+      
+      Bi[i,j] <- if (GAi[i,j]== GAi[i-1,j] - sigma) 0 else 2
+      
+
+      GAd[i, j] <- max(
+        GAd[i, j-1] - sigma,
+        GAtot[i, j-1] - (rho+sigma)
+      )
+      
+      Bd[i,j] <- if (GAd[i,j]== GAd[i,j-1] - sigma) 1 else 2
+      
+
+      GAtot[i, j] <- max(
+        GAtot[i-1, j-1] + c_delta(r, s),
+        GAi[i, j],
+        GAd[i, j]
+      )
+      
+      if (GAtot[i,j] == GAtot[i-1, j-1] && c_delta(r, s)==0) { 
+        Btot[i,j] <- 2
+      } else {
+        if (GAtot[i,j]==GAi[i, j]){
+          Btot[i,j] <- 0
+        } else {
+          Btot[i,j] <- if (GAtot[i,j]==GAd[i, j]) 1 else 2
+        }
+      }
+    }
+  }
+  
+  printGA(
+    btot = Btot,
+    bi = Bi,
+    bd = Bd,
+    r = R,
+    s = S,
+    i = lr+1,
+    j = ls+1
+  )
+  
+  # print(Bi)
+  # print(Bd)
+  # print(-GAtot)
+  # print(Btot)
+}
+```
+
+```{r}
+GA(R, S)
+
+GA("AAAAAAATTT", "TTT")
+
+GA("TTT", "AAAAAAATTT")
+
+GA("TTTAAAAAAA", "TTT")
+
+GA("TTT", "TTTAAAAAAA")
+```
+
+
+## Local Alignment
+
+```{r}
+# Fonction écrire l'alignement
+
+printLA <- function(b, r, s, i, j, LAr = c(), LAs = c()){
+  # print("---------")
+  # print(b[i, j])
+  # print(LAr)
+  # print(LAs)
+  if (b[i, j] == -1) {
+    
+    print(LAr)
+    print(LAs)
+    
+  } else if (b[i, j] == 0) {
+    
+    printLA(b, r, s, i-1, j, LAr = c(substr(r, i-1, i-1), LAr), LAs = c("-", LAs))
+    
+  } else if (b[i, j] == 1) {
+    
+    printLA(b, r, s, i, j-1, LAr = c("-", LAr), LAs = c(substr(r, j-1, j-1), LAs))
+    
+  } else if (b[i, j] == 2) {
+    
+    printLA(b, r, s, i-1, j-1, LAr = c(substr(r, i-1, i-1), LAr), LAs = c(substr(s, j-1, j-1), LAs))
+    
+  }
+  
+}
+```
+
+```{r}
+# La fonction coût
+
+deltaLA <- function(r = "-", s = "-"){
+  if (r == "-") {
+    return(-1)
+  }
+  
+  if (s == "-") {
+    return(-1)
+  }
+  
+  return (if (r==s) 1 else -1)
+}
+```
+
+```{r}
+# Fonction Local Alignment
+
+LA <- function(R, S, c_delta = deltaLA){
+  lr <- nchar(R)
+  ls <- nchar(S)
+
+  # Création de la matrice
+  LAmat <- matrix(0, nrow = lr + 1, ncol = ls + 1)
+  
+  # Création de la matrice de backtracking
+  B <- matrix(-1, nrow = lr + 1, ncol = ls + 1)
+  
+  # Initialisation déjà faite car on a des 0 partout
+  
+  # Remplissage
+  for (k in 4:(lr + ls + 2)) {
+    for (i in max(2, k - ls -1):min(k - 2, lr + 1)) {
+      j <- k - i
+      r <- substr(R, i - 1, i - 1)
+      s <- substr(S, j - 1, j - 1)
+
+      LAmat[i, j] <- max(
+        LAmat[i-1, j] + c_delta(r = r),
+        LAmat[i, j-1] + c_delta(s = s),
+        LAmat[i-1, j-1] + c_delta(r, s),
+        0
+      )
+      
+      if (LAmat[i, j] == 0){
+        B[i, j] <- -1
+      } else if (LAmat[i, j] == LAmat[i-1, j-1] + c_delta(r, s) && r==s) {
+        B[i, j] <- 2
+      } else if (LAmat[i, j] == LAmat[i-1, j] + c_delta(r, s)) {
+        B[i, j] <- 0
+      } else if (LAmat[i, j] == LAmat[i, j-1] + c_delta(r, s)) {
+        B[i, j] <- 1
+      } else if (LAmat[i, j] == LAmat[i-1, j-1] + c_delta(r, s) && r!=s) {
+        B[i, j] <- 2
+      }
+    }
+  }
+  
+  find_max_position <- function(mat) {
+    max_index <- which.max(mat)
+    max_position <- arrayInd(max_index, dim(mat))
+    return(max_position)
+  }
+  
+  pos <- find_max_position(LAmat)
+  # print(pos)
+  
+  printLA(B, R, S, pos[1], pos[2])
+  
+  
+  # print(LAmat)
+  # print(B)
+}
+```
+
+```{r}
+LA("AGCTTAGC", "GCTAGGA")
+
+LA("AAAAAAATTT", "TTT")
+
+LA("TTT", "AAAAAAATTT")
+
+LA("TTTAAAAAAA", "TTT")
+
+LA("TTT", "TTTAAAAAAA")
+
+LA("GTTTG", "AAAAATTTTAAAAAAA")
+```
+
+

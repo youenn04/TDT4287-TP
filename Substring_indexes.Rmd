@@ -1,0 +1,47 @@
+```{r}
+# Librairies
+
+# library(data.tree)  # https://cran.r-project.org/web/packages/data.tree/vignettes/data.tree.html
+
+```
+
+# Data structure: Arbre
+
+```{r}
+setClass(
+  Class = "Tree",
+  slots = list(
+    name = "character",       # Node name
+    children = "list",        # Children list
+    edge_labels = "list",     # Label list for edges
+    parent = "Tree_OR_NULL"   # Parent node
+  )
+)
+
+setClassUnion("Tree_OR_NULL", c("Tree", "NULL"))
+```
+
+```{r}
+Tree <- function(name, parent = NULL) {
+  new("Tree", name = name, children = list(), edge_labels = list(), parent = parent)
+}
+```
+
+
+
+# Substring indexes
+
+
+```{r}
+HighLevelUkkonen <- function(S) {
+  ls <- len(S)
+  
+  
+}
+
+```
+
+
+
+
+
